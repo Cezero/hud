@@ -5,9 +5,9 @@ local plugins = require('plugins')
 logger.prefix = string.format("\at%s\ax", "[HUD]")
 logger.postfix = function () return string.format(" %s", os.date("%X")) end
 
-plugins.EnsureIsLoaded("mq2debuffs")
+plugins.EnsureAnyIsLoaded({ "charinfo", "mqcharinfo" })
 
-local actor = require('actor')
+local dataSource = require('data_source')
 local settingsOpt = require('settings')
 local hudInit = require('hud')
 
@@ -23,7 +23,7 @@ local function is_orchestrator()
 end
 
 while not hud.ShouldTerminate() do
-  actor.Process(settings)
+  dataSource.Process(settings)
   hud.Update()
   hud.ShouldDrawGui(is_orchestrator())
   mq.delay(settings.update_frequency)

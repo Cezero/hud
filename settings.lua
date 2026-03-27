@@ -161,8 +161,24 @@ end
 ---@param filePath string
 ---@return table
 local function loadConfig (filePath)
-  local f = assert(loadfile(filePath))
-  return f()
+  local loaded, err = loadfile(filePath)
+  if not loaded then
+    logger.Error("Unable to load config '%s': %s", filePath, tostring(err))
+    return {}
+  end
+
+  local ok, result = pcall(loaded)
+  if not ok then
+    logger.Error("Config execution failed for '%s': %s", filePath, tostring(result))
+    return {}
+  end
+
+  if type(result) ~= "table" then
+    logger.Error("Config '%s' did not return a table", filePath)
+    return {}
+  end
+
+  return result
 end
 
 -- https://stackoverflow.com/questions/295052/how-can-i-determine-the-os-of-the-system-from-within-a-lua-script
@@ -180,12 +196,94 @@ if fileExists(configFilePath) then
   settings = leftJoin(settings, loadedSettings)
 end
 
+---@param filePath string
+---@return string
+local function directoryFromPath(filePath)
+  local i = filePath:match("^.*()[/\\]")
+  if i then
+    return filePath:sub(1, i - 1)
+  end
+  return "."
+end
+
+---@param dirPath string
+---@return boolean
+local function directoryExists(dirPath)
+  local ok, _, code = os.rename(dirPath, dirPath)
+  if ok then
+    return true
+  end
+
+  -- Permission denied can still mean the path exists.
+  return code == 13
+end
+
+---@param dirPath string
+---@return boolean
+local function ensureDirectory(dirPath)
+  if directoryExists(dirPath) then
+    return true
+  end
+
+  local normalizedDir = dirPath:gsub("[/\\]", pathSep)
+  local segments = {}
+  for segment in normalizedDir:gmatch("[^/\\]+") do
+    table.insert(segments, segment)
+  end
+
+  local currentPath = ""
+  local drive = normalizedDir:match("^([A-Za-z]:)")
+  local startIndex = 1
+  if drive then
+    currentPath = drive .. pathSep
+    startIndex = 2
+  elseif normalizedDir:sub(1, 1) == pathSep then
+    currentPath = pathSep
+  end
+
+  for i = startIndex, #segments do
+    local segment = segments[i]
+    if currentPath == "" or currentPath:sub(-1) == pathSep then
+      currentPath = currentPath .. segment
+    else
+      currentPath = currentPath .. pathSep .. segment
+    end
+
+    if not directoryExists(currentPath) then
+      local cmd
+      if pathSep == "\\" then
+        cmd = string.format('mkdir "%s" >nul 2>nul', currentPath)
+      else
+        cmd = string.format('mkdir -p "%s" >/dev/null 2>&1', currentPath)
+      end
+      os.execute(cmd)
+
+      if not directoryExists(currentPath) then
+        return false
+      end
+    end
+  end
+
+  return directoryExists(dirPath)
+end
+
 local function saveConfig(newSettings)
-  -- mq.pickle(configFilePath, newSettings)
-  local file = assert(io.open(configFilePath, "w"))
+  local configDirPath = directoryFromPath(configFilePath)
+  if not ensureDirectory(configDirPath) then
+    logger.Error("Unable to create HUD config directory: '%s'", configDirPath)
+    return false
+  end
+
+  local file, err = io.open(configFilePath, "w")
+  if not file then
+    logger.Error("Unable to open HUD config for write '%s': %s", configFilePath, tostring(err))
+    return false
+  end
+
   file:write(toString(newSettings))
   file:close()
   settings = newSettings
+  return true
 end
 
 return {

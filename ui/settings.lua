@@ -4,6 +4,9 @@ local renderGeneralTab = require('ui/tabs/general')
 local renderGroupTab = require('ui/tabs/groups')
 
 local _open, _showUI = false, true
+local _saveStatus = ""
+local _saveStatusExpiresAt = 0
+local saveStatusDurationMs = 3000
 
 local function renderSettingsWindow(settings, writeSettingsFile)
   if imgui.BeginTabBar("HUDSETTINGSTAB##", ImGuiTabBarFlags.None) then
@@ -18,7 +21,19 @@ local function renderSettingsWindow(settings, writeSettingsFile)
     imgui.EndTabBar()
   end
   if imgui.Button("Save to file") then
-    writeSettingsFile(settings)
+    local saved = writeSettingsFile(settings)
+    if saved then
+      _saveStatus = "Settings saved."
+    else
+      _saveStatus = "Save failed. Check MQ logs."
+    end
+    _saveStatusExpiresAt = mq.gettime() + saveStatusDurationMs
+  end
+
+  if _saveStatus ~= "" and mq.gettime() <= _saveStatusExpiresAt then
+    imgui.Text(_saveStatus)
+  elseif _saveStatus ~= "" then
+    _saveStatus = ""
   end
 end
 

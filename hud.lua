@@ -2,7 +2,7 @@ local mq = require('mq')
 local imgui = require('ImGui')
 local logger = require('knightlinc.Write')
 local hudBot = require('hudbot')
-local actor = require('actor')
+local dataSource = require('data_source')
 local settingsUI = require('ui.settings')
 
 local function init(settings, writeSettingsFile)
@@ -168,13 +168,13 @@ local function init(settings, writeSettingsFile)
 
   local function updateHudData()
     for name, _ in pairs(hudData) do
-      if not actor.Data[name] then
+      if not dataSource.Data[name] then
         logger.Debug("<HudBot data for %s not found, removing from HUD...", name)
         hudData[name] = nil
       end
     end
 
-    for name, data in pairs(actor.Data) do
+    for name, data in pairs(dataSource.Data) do
       if not hudData[name] then
         hudData[name] = hudBot:New(data)
       else
