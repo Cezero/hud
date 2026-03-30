@@ -46,8 +46,22 @@ local function runningScripts(peer)
     return ''
   end
 
+  local scripts = peer.Lua.Scripts
+  if type(scripts) == 'function' then
+    local ok, resolved = pcall(scripts, peer.Lua)
+    if ok then
+      scripts = resolved
+    else
+      scripts = nil
+    end
+  end
+
+  if type(scripts) ~= 'table' then
+    return ''
+  end
+
   local scriptNames = {}
-  for _, script in ipairs(peer.Lua.Scripts) do
+  for _, script in ipairs(scripts) do
     if script and type(script.Name) == 'string' and script.Name ~= 'hud/pids' then
       table.insert(scriptNames, script.Name)
     end
