@@ -143,26 +143,28 @@ local function pctExp(data)
 end
 
 ---@param data HUDInfo
+local function aa(data)
+  return newHUDItem(string.format("%d / %d", data.AASpent or 0, data.AAUnused or 0))
+end
+
+---@param data HUDInfo
 local function distance(data)
-  local distanceText = "%s"
+  local distanceText = ""
   local distanceColor = nil
-  if data.Id == mq.TLO.Me.ID() then
-    distanceText = ""
-  elseif data.ZoneShortName == mq.TLO.Zone.ShortName() then
+  if data.Id ~= mq.TLO.Me.ID() and data.ZoneShortName == mq.TLO.Zone.ShortName() then
     local spawnDistance = mq.TLO.Spawn(data.Id).Distance3D()
     if spawnDistance then
       local distancePercent = 100 - (math.min(spawnDistance, 500) / 500 * 100)
       distanceColor = distTransition:ByPercent(distancePercent)
-      distanceText = string.format(distanceText, string.format("%.2f", spawnDistance))
+      distanceText = string.format("%.2f", spawnDistance)
     end
-  else
+  elseif data.Id ~= mq.TLO.Me.ID() then
     distanceColor = Orange:Unpack()
     local instanceId = data.InstanceId
     if instanceId > 0 then
-      local text = string.format("%s[%d]", data.ZoneShortName, instanceId)
-      distanceText = string.format(distanceText, text)
+      distanceText = string.format("%s[%d]", data.ZoneShortName, instanceId)
     else
-      distanceText = string.format(distanceText, data.ZoneShortName)
+      distanceText = data.ZoneShortName or ""
     end
   end
 
@@ -226,11 +228,12 @@ end
 ---@field public PctHP HUDItem
 ---@field public PctMana HUDItem
 ---@field public PctExp HUDItem
+---@field public AA HUDItem
 ---@field public Distance HUDItem
 ---@field public Target HUDItem
 ---@field public Casting HUDItem
 ---@field public Pet HUDItem
-local HUDBot = {Name=HUDItem, Level=HUDItem, PctHP=HUDItem, PctMana=HUDItem, PctExp=HUDItem, Distance=HUDItem, Target=HUDItem, Casting=HUDItem, Pet=HUDItem, PIDs=HUDItem}
+local HUDBot = {Name=HUDItem, Level=HUDItem, PctHP=HUDItem, PctMana=HUDItem, PctExp=HUDItem, AA=HUDItem, Distance=HUDItem, Target=HUDItem, Casting=HUDItem, Pet=HUDItem, PIDs=HUDItem}
 
 ---@param data HUDInfo
 ---@return HUDBot
@@ -242,6 +245,7 @@ function HUDBot:New (data)
   o.PctHP = pctHP(data)
   o.PctMana = pctMana(data)
   o.PctExp = pctExp(data)
+  o.AA = aa(data)
   o.Distance = distance(data)
   o.Target = target(data)
   o.Pet = pet(data)
@@ -257,6 +261,7 @@ function HUDBot:Update (data)
   self.PctHP = pctHP(data)
   self.PctMana = pctMana(data)
   self.PctExp = pctExp(data)
+  self.AA = aa(data)
   self.Distance = distance(data)
   self.Target = target(data)
   self.Pet = pet(data)

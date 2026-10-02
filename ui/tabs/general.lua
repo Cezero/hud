@@ -21,6 +21,19 @@ local function renderGeneralTab(settings)
     settings.ui.layoutType, _ = imgui.RadioButton("Group", settings.ui.layoutType, 2)
   end
 
+  imgui.Text("Columns")
+  local columns, _ = imgui.InputInt("##Columns", settings.ui.columns or 1, 1, 1)
+  if type(columns) ~= "number" then
+    columns = 1
+  end
+  columns = math.floor(columns)
+  if columns < 1 then
+    columns = 1
+  elseif columns > 8 then
+    columns = 8
+  end
+  settings.ui.columns = columns
+
   imgui.Text("Update Frequency (ms)")
   settings.update_frequency, _ = imgui.InputInt("##UpdateFrequency", settings.update_frequency, 100, 1000)
   imgui.Text("Stale Data Timeout (m)")

@@ -114,6 +114,8 @@ function adapter.ToHUDInfo(peer)
     TargetId = target and asNumber(target.ID, 0) > 0 and asNumber(target.ID, 0) or nil,
     Level = asNumber(peer and peer.Level or nil, 0),
     PctExp = exp and asNumber(exp.PctExp, 100) or 100,
+    AASpent = exp and asNumber(exp.AASpent, 0) or 0,
+    AAUnused = exp and asNumber(exp.AAUnused, 0) or 0,
     PetPctHPs = asNumber(peer and peer.PetHP or nil, 0),
     Casting = castingSpellName(castingSpellID),
     ZoneShortName = asString(zone and zone.ShortName or nil, ''),

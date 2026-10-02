@@ -128,11 +128,17 @@ end
 ---@field locked boolean
 ---@field showNavBar boolean
 ---@field layoutType LayoutTypes
+---@field columns integer
 ---@field scale number
 ---@field opacity number
 
+---@class HUDGroup
+---@field name string
+---@field enabled boolean
+---@field members string[]
+
 ---@class HUDSettings
----@field groups table
+---@field groups HUDGroup[]
 ---@field update_frequency number
 ---@field stale_data_timer number
 ---@field loglevel string
@@ -146,6 +152,7 @@ local settings = {
     locked = true,
     showNavBar = false,
     layoutType = 1,
+    columns = 1,
     scale = 1.0,
     opacity = 0.3
   }
@@ -190,11 +197,47 @@ if pathSep ~= "/" then
   configFilePath = configFilePath:gsub("/", "\\")
 end
 
+---@param groups table|nil
+---@return HUDGroup[]
+local function normalizeGroups(groups)
+  if type(groups) ~= "table" then
+    return {}
+  end
+
+  local normalized = {}
+  for index, group in ipairs(groups) do
+    if type(group) == "table" and type(group.members) == "table" then
+      if group.enabled == nil then
+        group.enabled = true
+      end
+      if type(group.name) ~= "string" or group.name == "" then
+        group.name = "Group " .. index
+      end
+      table.insert(normalized, group)
+    elseif type(group) == "table" then
+      local members = {}
+      for _, name in ipairs(group) do
+        if type(name) == "string" then
+          table.insert(members, name)
+        end
+      end
+      table.insert(normalized, {
+        name = "Group " .. index,
+        enabled = true,
+        members = members,
+      })
+    end
+  end
+
+  return normalized
+end
+
 if fileExists(configFilePath) then
   logger.Info("Loading config from '%s'", configFilePath)
   local loadedSettings = loadConfig(configFilePath)
   settings = leftJoin(settings, loadedSettings)
 end
+settings.groups = normalizeGroups(settings.groups)
 
 ---@param filePath string
 ---@return string
