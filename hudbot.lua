@@ -84,17 +84,23 @@ local distTransition = ColorTransition:new(DarkCyan, Orange)
 ---@class HUDItem
 ---@field public Text string
 ---@field public Color ImVec4
-local HUDItem = {Text="", Color = White:Unpack()}
+---@field public Strikethrough boolean
+local HUDItem = {Text="", Color = White:Unpack(), Strikethrough = false}
 
 ---@param text string
 ---@param color? ImVec4
+---@param strikethrough? boolean
 ---@return HUDItem
-local function newHUDItem (text, color)
-  return { Text = text or "NA", Color = color or White:Unpack() };
+local function newHUDItem (text, color, strikethrough)
+  return { Text = text or "NA", Color = color or White:Unpack(), Strikethrough = strikethrough or false };
 end
 
 ---@param data HUDInfo
 local function name(data)
+  if data.IsDead then
+    return newHUDItem(data.Name, Red:Unpack(), true)
+  end
+
   if data.IsFeared then
     return newHUDItem(data.Name, Red:Unpack())
   end

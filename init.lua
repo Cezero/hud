@@ -14,18 +14,16 @@ local hudInit = require('hud')
 local settings = settingsOpt.LoadConfig()
 logger.loglevel = settings.loglevel
 
-local hud = hudInit(settings, settingsOpt.SaveConfig)
-
--- Am I the foreground instance?
----@return boolean
-local function is_orchestrator()
-  return mq.TLO.EverQuest.Foreground() -- or mq.TLO.FrameLimiter.Status() == "Foreground"
-end
+local hud = hudInit(settings)
 
 while not hud.ShouldTerminate() do
   dataSource.Process(settings)
   hud.Update()
-  hud.ShouldDrawGui(is_orchestrator())
+  hud.ShouldDrawGui()
+  settingsOpt.SaveIfChanged()
   mq.delay(settings.update_frequency)
 end
+
+hud.FlushColumnWidths()
+settingsOpt.SaveIfChanged()
 

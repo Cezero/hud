@@ -14,6 +14,8 @@ local function renderGeneralTab(settings)
   settings.ui.locked, _ = imgui.Checkbox("##LockHUD", settings.ui.locked)
   imgui.Text("Show NavBar")
   settings.ui.showNavBar, _ = imgui.Checkbox("##SHOWNAVBAR", settings.ui.showNavBar)
+  imgui.Text("Only when focused")
+  settings.ui.foregroundOnly, _ = imgui.Checkbox("##ForegroundOnly", settings.ui.foregroundOnly)
   imgui.Text("HUD render order")
   settings.ui.layoutType, _ = imgui.RadioButton("Name", settings.ui.layoutType, 1)
   if next(settings.groups) then

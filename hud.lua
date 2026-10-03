@@ -44,8 +44,8 @@ local function splitIntoColumns(list, columns)
   return slices
 end
 
-local function init(settings, writeSettingsFile)
-  settingsUI.Init(settings, writeSettingsFile)
+local function init(settings)
+  settingsUI.Init(settings)
   ---@type table<string, HUDBot>
   local hudData = {}
 
@@ -64,6 +64,12 @@ local function init(settings, writeSettingsFile)
     else
       imgui.PushStyleColor(ImGuiCol.Text, hudItem.Color)
       imgui.Text(hudItem.Text)
+      if hudItem.Strikethrough then
+        local minX, minY = imgui.GetItemRectMin()
+        local maxX, maxY = imgui.GetItemRectMax()
+        local midY = (minY + maxY) * 0.5
+        imgui.GetWindowDrawList():AddLine(ImVec2(minX, midY), ImVec2(maxX, midY), imgui.GetColorU32(hudItem.Color), 1)
+      end
       imgui.PopStyleColor(1)
     end
 
@@ -119,6 +125,145 @@ local function init(settings, writeSettingsFile)
   local ColumnID_Pet = 7
   local ColumnID_Casting = 8
   local ColumnID_PIDs = 9
+  local columnWidthSaveInterval = 10000
+  local statColumns = {
+    { label = 'Name', id = ColumnID_Name, field = 'Name' },
+    { label = 'Lvl', id = ColumnID_Level, field = 'Level' },
+    { label = 'HP', id = ColumnID_HP, field = 'PctHP' },
+    { label = 'MP', id = ColumnID_MP, field = 'PctMana' },
+    { label = 'XP', id = ColumnID_XP, field = 'PctExp' },
+    { label = 'AA', id = ColumnID_AA, field = 'AA' },
+    { label = 'Dist', id = ColumnID_Distance, field = 'Distance' },
+    { label = 'Tar', id = ColumnID_Target, field = 'Target' },
+    { label = 'Pet', id = ColumnID_Pet, field = 'Pet' },
+    { label = 'Cast', id = ColumnID_Casting, field = 'Casting' },
+    { label = 'PIDs', id = ColumnID_PIDs, field = 'PIDs' },
+  }
+  ---@type table<string, number>
+  local columnContentWidth = {}
+  local columnWidthsDirty = false
+  local lastColumnWidthCopy = mq.gettime()
+
+  local savedColumnWidths = settings.ui.columnWidths
+  if type(savedColumnWidths) == "table" then
+    for _, column in ipairs(statColumns) do
+      local width = savedColumnWidths[column.label]
+      if type(width) == "number" and width > 0 then
+        columnContentWidth[column.label] = width
+      end
+    end
+  end
+
+  local function fontScale()
+    local scale = settings.ui.scale
+    if type(scale) ~= "number" or scale <= 0 then
+      return 1
+    end
+    return scale
+  end
+
+  ---@param label string
+  ---@param text string|nil
+  local function noteColumnText(label, text)
+    if type(text) ~= "string" or text == "" then
+      return
+    end
+    local pixelWidth = imgui.CalcTextSize(text)
+    local unscaled = math.ceil(pixelWidth / fontScale())
+    if unscaled > (columnContentWidth[label] or 0) then
+      columnContentWidth[label] = unscaled
+      columnWidthsDirty = true
+    end
+  end
+
+  ---@param bot HUDBot
+  local function noteBotColumns(bot)
+    for _, column in ipairs(statColumns) do
+      local item = bot[column.field]
+      if item then
+        noteColumnText(column.label, item.Text)
+      end
+    end
+  end
+
+  ---@param slices (HUDBot[]|HUDGroup[])[]
+  ---@param groupLayout boolean
+  local function noteVisibleColumns(slices, groupLayout)
+    for _, column in ipairs(statColumns) do
+      noteColumnText(column.label, column.label)
+    end
+    for _, slice in ipairs(slices) do
+      if groupLayout then
+        for _, group in ipairs(slice) do
+          for _, name in ipairs(group.members or {}) do
+            local bot = hudData[name]
+            if bot then
+              noteBotColumns(bot)
+            end
+          end
+        end
+      else
+        for _, bot in ipairs(slice) do
+          noteBotColumns(bot)
+        end
+      end
+    end
+  end
+
+  ---@param label string
+  ---@return number
+  local function columnInitWidth(label)
+    local stored = columnContentWidth[label]
+    if type(stored) ~= "number" or stored <= 0 then
+      return -1.0
+    end
+    return stored * fontScale()
+  end
+
+  local function columnWidthsMatchSettings()
+    local saved = settings.ui.columnWidths
+    if type(saved) ~= "table" then
+      return false
+    end
+    for _, column in ipairs(statColumns) do
+      local live = columnContentWidth[column.label]
+      local stored = saved[column.label]
+      if live == nil then
+        if type(stored) == "number" and stored > 0 then
+          return false
+        end
+      elseif stored ~= live then
+        return false
+      end
+    end
+    return true
+  end
+
+  ---@param force boolean
+  local function flushColumnWidths(force)
+    if not columnWidthsDirty then
+      return
+    end
+    if columnWidthsMatchSettings() then
+      columnWidthsDirty = false
+      return
+    end
+    if not force and mq.gettime() - lastColumnWidthCopy < columnWidthSaveInterval then
+      return
+    end
+
+    local saved = {}
+    for _, column in ipairs(statColumns) do
+      local width = columnContentWidth[column.label]
+      if type(width) == "number" and width > 0 then
+        saved[column.label] = width
+      end
+    end
+    settings.ui.columnWidths = saved
+    columnWidthsDirty = false
+    lastColumnWidthCopy = mq.gettime()
+  end
+
   -- Shared visibility across side-by-side tables. ImGui commits a menu toggle on the next frame,
   -- so this only pushes a change onto a table that has not already adopted it.
   local sharedColumnEnabled = nil
@@ -251,17 +396,9 @@ local function init(settings, writeSettingsFile)
       return
     end
 
-    imgui.TableSetupColumn('Name', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_Name)
-    imgui.TableSetupColumn('Lvl', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_Level)
-    imgui.TableSetupColumn('HP', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_HP)
-    imgui.TableSetupColumn('MP', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_MP)
-    imgui.TableSetupColumn('XP', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_XP)
-    imgui.TableSetupColumn('AA', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_AA)
-    imgui.TableSetupColumn('Dist', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_Distance)
-    imgui.TableSetupColumn('Tar', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_Target)
-    imgui.TableSetupColumn('Pet', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_Pet)
-    imgui.TableSetupColumn('Cast', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_Casting)
-    imgui.TableSetupColumn('PIDs', ImGuiTableColumnFlags.WidthFixed, -1.0, ColumnID_PIDs)
+    for _, column in ipairs(statColumns) do
+      imgui.TableSetupColumn(column.label, ImGuiTableColumnFlags.WidthFixed, columnInitWidth(column.label), column.id)
+    end
     imgui.TableHeadersRow()
     renderRows()
 
@@ -300,7 +437,10 @@ local function init(settings, writeSettingsFile)
 
   -- ImGui main function for rendering the UI window
   local hud = function()
-    if not openGUI then return end
+    if not openGUI then
+      flushColumnWidths(false)
+      return
+    end
     local flags = windowFlags
     if settings.ui.locked then
       flags = bit32.bor(flags, ImGuiWindowFlags.NoMove)
@@ -325,8 +465,10 @@ local function init(settings, writeSettingsFile)
       if #slices == 0 then
         slices = {{}}
       end
+      noteVisibleColumns(slices, groupLayout)
 
       -- Place stat tables beside each other. Nesting them in a parent table clips each one to an unresolved cell.
+      local columnRects = {}
       for i, slice in ipairs(slices) do
         if i > 1 then
           imgui.SameLine()
@@ -341,11 +483,29 @@ local function init(settings, writeSettingsFile)
             end
           end
         end)
+        local minX, minY = imgui.GetItemRectMin()
+        local maxX, maxY = imgui.GetItemRectMax()
+        columnRects[i] = { minX = minX, minY = minY, maxX = maxX, maxY = maxY }
+      end
+
+      if #columnRects > 1 then
+        local spacing = imgui.GetStyle().ItemSpacing.x
+        local drawList = imgui.GetWindowDrawList()
+        local color = imgui.GetColorU32(0.22, 0.22, 0.22, 1)
+        for i = 1, #columnRects - 1 do
+          local left = columnRects[i]
+          local right = columnRects[i + 1]
+          local x = left.maxX + spacing * 0.5
+          local y1 = math.min(left.minY, right.minY)
+          local y2 = math.max(left.maxY, right.maxY)
+          drawList:AddLine(ImVec2(x, y1), ImVec2(x, y2), color, 1)
+        end
       end
     elseif not settings.ui.showNavBar then
       settings.ui.showNavBar = true
     end
 
+    flushColumnWidths(false)
     imgui.End()
     if not openGUI then
         terminate = true
@@ -376,15 +536,21 @@ local function init(settings, writeSettingsFile)
       return terminate
   end
 
-  ---@param doDraw boolean
-  local function shouldDrawGui(doDraw)
-    openGUI = doDraw
+  local function shouldDrawGui()
+    if settings.ui.foregroundOnly then
+      openGUI = mq.TLO.EverQuest.Foreground()
+    else
+      openGUI = true
+    end
   end
 
   return {
     ShouldDrawGui = shouldDrawGui,
     ShouldTerminate = shouldTerminate,
     Update = updateHudData,
+    FlushColumnWidths = function()
+      flushColumnWidths(true)
+    end,
   }
 
 end

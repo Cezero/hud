@@ -39,6 +39,25 @@ local function containsFear(value)
   return false
 end
 
+---@param value any
+---@return boolean
+local function containsDead(value)
+  if type(value) ~= 'table' then
+    return false
+  end
+
+  for _, state in ipairs(value) do
+    if type(state) == 'string' then
+      local upper = string.upper(state)
+      if upper == 'HOVER' or upper == 'DEAD' then
+        return true
+      end
+    end
+  end
+
+  return false
+end
+
 ---@param peer table
 ---@return string
 local function runningScripts(peer)
@@ -122,6 +141,7 @@ function adapter.ToHUDInfo(peer)
     InstanceId = asNumber(zone and zone.InstanceID or nil, 0),
     HasCounters = (countPoison + countDisease + countCurse + countCorruption) > 0,
     IsFeared = containsFear(peer and peer.State or nil),
+    IsDead = containsDead(peer and peer.State or nil),
     IsInRaid = inRaid,
     IsGrouped = grouped,
     RunningScripts = runningScripts(peer),

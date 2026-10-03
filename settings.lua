@@ -131,6 +131,8 @@ end
 ---@field columns integer
 ---@field scale number
 ---@field opacity number
+---@field foregroundOnly boolean
+---@field columnWidths table<string, number>
 
 ---@class HUDGroup
 ---@field name string
@@ -154,7 +156,9 @@ local settings = {
     layoutType = 1,
     columns = 1,
     scale = 1.0,
-    opacity = 0.3
+    opacity = 0.3,
+    foregroundOnly = false,
+    columnWidths = {},
   }
 }
 
@@ -238,6 +242,7 @@ if fileExists(configFilePath) then
   settings = leftJoin(settings, loadedSettings)
 end
 settings.groups = normalizeGroups(settings.groups)
+local lastSaved = toString(settings)
 
 ---@param filePath string
 ---@return string
@@ -329,7 +334,22 @@ local function saveConfig(newSettings)
   return true
 end
 
+local function saveIfChanged()
+  local serialized = toString(settings)
+  if serialized == lastSaved then
+    return true
+  end
+
+  if not saveConfig(settings) then
+    return false
+  end
+
+  lastSaved = serialized
+  return true
+end
+
 return {
   LoadConfig = function() return settings end,
-  SaveConfig = saveConfig
+  SaveConfig = saveConfig,
+  SaveIfChanged = saveIfChanged,
 }
